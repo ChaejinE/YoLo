@@ -76,11 +76,13 @@
 - Final layer는 class 확률과 bbox 좌표를 predict한다.
 - bbox의 width, height를 normalize한다.
   - 0 ~ 1 사이 값을 갖게 된다.
+  - h/H, w/W (H, W : 전체 이미지의 height, width)
 - Bbox x, y좌표를 특정 grid cell에 위치시키기 위해 offset으로 매개 변수화 한다.
   - 0 ~ 1 사이로 값을 bound한다.
+  - **Ground Truth Bbox의 중심이 위치한 grid cell이 해당 Object를 Resnponsible하는 cell이다.** 
 - YOLO는 grid cell당 많은 bbox를 predict한다.
 - 학습 시 오직 하나의 Bbox를 얻기 위해 각 box predictor에게 object를 predicting할 "책임"을 assign 했다.
-  - 현재 가장 높은 IOU를 가지고있는 prediction을 기반으로 했다.
+  - **현재 가장 높은 IOU를 가지고있는 prediction을 기반**으로 하나의 Bbox를 학습에 사용했다.
 
 
 ## Loss Function
