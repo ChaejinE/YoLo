@@ -67,6 +67,9 @@
   - 특히 초기 iteration에서 모델이 불안정한 현상이 있다고 한다.
 - 이 불안정 문제는 대부분 box의 (x, y) location을 predicting 할때 발생했다.
 
+![image](https://user-images.githubusercontent.com/69780812/141389360-87f0c038-5345-449e-b3bb-0f0e9a4c2d52.png)
+- 기존 Faster RCNN의 bbox regression에서는 bbox가 image상 어떤 곳이든 나타날 수 있는 문제가 있다.
+
 ![image](https://user-images.githubusercontent.com/69780812/141219232-84117d44-897b-45e6-928a-351e22d8ce0d.png)
 - t_x = 1 : box를 anchor box의 너비를 기준으로 오른쪽으로 이동한다.
 - t_x = -1 : box를 anchor box의 너비 기준으로 왼쪽 이동시킨다.
@@ -113,7 +116,8 @@
 
 ## Multi-Scale Training
 - YOLOv2는 모델이 다른 size의 image들도 학습하길 바랬다.
-  - 기존 448x448 에서 anchor box 추가와함께 416x416로 바꿨었다.
+  - 기존 448x448 에서 anchor box 추가와함께 416x416로 바꿔서 fine tuning 헀었다.
+  - 하지만, conv, pooling layer로 모두 바꿔서 다양한 이미지를 input으로 받을 수 있다.
 - input image size를 고정하기 보다 10 batch마다 랜덤하게 새로운 image dimension size를 선택한다.
 - YOLOv2는 1/32로 Downsample 하기 때문에 {320, 352, ..., 608}로 다양한 size를 선택했다.
 - 이러한 정책은 다양한 input dimension으로 잘 predict하도록 학습시켰다.
@@ -139,7 +143,7 @@
 - batch normalization : Training 안정화, 수렴 속도 향상
 - ImageNet에 대해 top-1 accuracy가 72.9%, top-5 accuracy가 91.2%를 달성한바 있다.
 
-# 4. Stronger
+# 4. Stronger (YOLO9000 내용)
 - Classifiaction 및 Detection을 연결해서 습하는 메카니즘을 제안한다.
 - detection-specific information을 학습하기위해 bbox coordinate, objectness, 어떻게 Common Object로 분류할지와 같은 label된 image data를 사용한다.
 - Trainin하는 동안 detection과 classification dataset 둘다 image를 섞는다.
@@ -161,12 +165,14 @@
 ## Hierarchical classification
 - WordNet : concept들을 구조화하고, 어떻게 연관성이 있는지를 보여주는 language database다.
   - directed graph다.
+  - *terrier는 dog으로도, canine, domestic animal 등으로 여러 분류로도 나뉠 수 있지만 모든 분류에 대해 graph를 만들어 봤을 때, 짧은 path가 나온 것으로 WordNet을 구성했다고 한다.
 
 ![image](https://user-images.githubusercontent.com/69780812/141236357-77e57fc4-ee5b-4cda-85d1-08f14a5711ce.png)
 - ImageNet에서 concept들로 부터 계층 Tree를 구성하여 문제를 간단화 한다.
 - Final result : Word Tree
+- 색칠된 것들이 실제 Label들이다.
 
-![image](https://user-images .githubusercontent.com/69780812/141236679-60cebcb0-ecba-4b7e-b243-557e43a5dc16.png)
+![image](https://user-images.githubusercontent.com/69780812/141391312-fc3c38b1-9d36-4e84-952e-b205068bcdbe.png)
 - WordTree로 classification을 수행하기 위해 모든 노드에 대한 조건부 확률을 predict한다.
 - 위는 "terrier" node 에서의 예이다.
 - 특정 노드에 대한 절대적인 확률을 계산하고자한다.
@@ -184,16 +190,24 @@
 - classification에 대한 것은 image가 object를 포함하고 있다는 전제하에 진행한다.
 
 ![image](https://user-images.githubusercontent.com/69780812/141244724-9e730bbb-48d9-4700-a50d-9b6e74d76f5d.png)
-- 학습 진행 시 WordTree1k와 같은 ulti-label을 이용한다.
+- 학습 진행 시 WordTree1k와 같은 Multi-label을 이용한다.
+  - 학습 시 ground truth label을 상위로 Propagation 시킨다.
+  - ex) Norfolk terrier가 있으면 상위로 가면서 dog, mammal 등이 있을 텐데 이에 대해 label을 1로 두고 Propagate한다. (Multi label 처럼 되는 셈)
+
 - 같은 색깔을 갖는 부분들이 각각의 softmax에 적용되는 mutually exclusive(상호독립)인 부분으로 WordTree에서 같은 단계에 존재하는 노드들이다.
+  - 같은 Level의 것들 끼리 softmax를 취해 predict한다.
+  - 그리고 점점 상위로 가면서 각자의 상위 Level Node끼리 softmax를 취한다. (이렇게 구했던 것들로 Conditional Probability를 구해낸다.)
 - 이를 이용해 나온 조건부 확률들의 곱을 이용해 확률을 구해 학습을 수행한다.
 - WordTree 이용방법은 ImageNet 데이터 뿐아니라 COCO와 같은 다른 데이터들과 결합할때도 사용가능하다.
+  - COCO : general concepts
+  - ImageNet : Specific concepts
+  - 그래서 COCO가 상위 Level로 묶이게 되고, ImageNet이 하위 Level로 묶이는 현상이 나타난다.
 
 ## Joint classification and detection
 - COCO, ImageNet Top 9000개의 범주를 포함한 dataset을 WordTree를 이용해 결합시킨다.
 - 이를 통해 9418개의 범주를 갖는 dataset을 사용한다.
 - ImageNet과 COCO의 데이터 양을 고려해서 학습 시 비율을 4:1이 되게 조정한다.
 - 학습 시, detection data의 경우 full loss를 역전파하고, classification data의 경우 classification loss 부분만 역전파한다.
-- classification에서 label의 하위 범주들은 학습에 고려하지 않고 상위 범주들만 고려한다.
+- classification에서 label의 **하위 범주들은 학습에 고려하지 않고 상위 범주들만 고려**한다.
   - "dog" 범주인 경우 상위 범주인 "animal"은 고려해서 학습하지만 하위 범주인 "terrier"은 고려하지 않는다.
 - YOLOv2는 9000개 이상의 범주를 detection할수 있는 YOLO9000이 된다.
