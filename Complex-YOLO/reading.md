@@ -97,5 +97,66 @@
     - 5. pedestrian size (heading left)
 
 ### Complex Angle Regression
+![image](https://user-images.githubusercontent.com/69780812/144968646-bb027423-da94-444f-b58a-977da358acc9.png)
 - 각 Object에 대한 orientation angle은 t_im, t_re 라고하는 parameter들을 regression해서 계산할 수 있다.
-  - 
+  - 허수의 phase에 대응된다.
+- angle은 arctan2(t_im, t_re)로 간단하게 표현된다.
+- 한편으로는 이것이 singularity들을 피하게 하고, 다른 한편으로는 수학적인 space을 닫아준다.
+  - 간단하게 수식을 표현해서 수학적 복잡성을 줄여준다는 의미이다.
+  - 이러한 것이 모델의 일반화에 장점으로 작용한다고한다. (왜? 복잡성을 줄여서?)
+- regression parameter들은 이제 loss function에 직접적으로 link 된다.
+
+## 2.3 Loss Function
+- optimization loss function은 YOLO와 YOLOv2 컨셉을 기반으로 만들었다.
+
+![image](https://user-images.githubusercontent.com/69780812/144969057-12904377-595c-4491-9267-a9f101cec1e0.png)
+- L_yolo : squared error 의 합이다.
+  - multi-part loss에서 소개된 것을 사용한 것이다.
+- Euler regression part을 통해 이 접근을 확장 시킨다.
+  - Complex number들을 얻기 위함이다.
+  - angle 비교에 대해 수학적인 space를 닫아줘 복잡성을 줄여준다.
+
+![image](https://user-images.githubusercontent.com/69780812/144968646-bb027423-da94-444f-b58a-977da358acc9.png)
+- Euler regression 부분은 E-RPN에대한 aid가 정의되어 있다.
+
+![image](https://user-images.githubusercontent.com/69780812/144969325-c6d30ac2-db29-4a38-ba23-30713161c393.png)
+- ground truth 와 prediction은 complex number이다.
+
+![image](https://user-images.githubusercontent.com/69780812/144987750-7160a997-0ba4-4d21-beef-5b4b0512bb24.png)
+- ground truth와 prediction은 위와 같이 표기된다. 항상 abs(z)와 abs(z^)는 항상 1인 unit circle에 대해 위치되어진다.
+- 실수 loss를 얻기 위해서 squared error의 절대값으 최소화한다.
+- lambda_coord : 초기 단계에서 수렴을 안정화하는 것을 보장하는 factor
+- ![image](https://user-images.githubusercontent.com/69780812/144988123-94529320-ea7f-445c-b795-8cfb1f85edb5.png) : i번째 cell에 들어있는 j 번째 bounding box predictor는 prediction과 ground turth와 비교한 것들 중 IOU ![image](https://user-images.githubusercontent.com/69780812/144988730-cd9e48b3-55ca-44d0-ad73-ddefe1a8d537.png)가 가장 높은 box를 의미한다.
+  - 여기서 IOU의 분자, 분모는 ![image](https://user-images.githubusercontent.com/69780812/144988812-89523da1-454e-4f3b-b557-3de4dede5f1e.png) 이와 같이 정의된다. 회전된 박스들을 잘 조작하도록 조정한다고 한다.
+- box parameters : ![image](https://user-images.githubusercontent.com/69780812/144988624-c14e77b3-65db-4f3d-965f-2b1562a9fd91.png)
+
+## 2.4 Efficiency Design
+- 이 Network 설께의 장점은 모든 bounding box들을 한번의 inference에 prediction 할 수 있다는 것이다.
+- E-RPN은 모든 bounding box들을 predict하기 위해서 마지막 convolution layer의 output으로 사용된다.
+  - 그래서 end-to-end 방식이라고 한다. 어떤 따로 Training 기법이 적용하는 것이아니라 같이 학습 시키기 때문이다.
+- 다른 network와 비교해서 mAP는 유지하면서 높은 Frame rate를 얻는다고 한다.
+
+# 3. Training & Experiments
+- Input은 Lidar Point Cloud이고, birds-eye-view에 초점이 맞춰진다.
+
+## 3.1 Training Details
+- optimizer : stochastic gradient descent
+- weight decay : 0.0005
+- momentum : 0.9
+- pre-processing
+  - 벨로다인 sample로부터 birds-eye-veiw RGB-maps
+- train set : 85 %
+- val set : 15 %
+- 시작은 small learning rate, some epoch에서 scale up
+- CNN 마지막 layer에 leaky relu
+
+## 3.2 Evaluation on KITTI
+
+### Birds-Eye-View
+
+### 3D Object Detection
+
+# 4. Conclusion
+- Lidar 이 하나의 센서만으로 학습한다.
+- E-RPN을 통해 complex number들의 aid를 가지고 방향을 추정하는 regression 기법을 도입하게 되면서 50FPS, robust, closed mathematical space 를 성취할 수 있었다.
+- 미래에는 height 정보를 regression할 계획이라고 한다.
